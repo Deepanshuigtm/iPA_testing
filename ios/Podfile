@@ -31,14 +31,7 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
-  # Install all Flutter iOS Pods
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-
-
-
-  # Specify Firebase dependencies if needed
-  pod 'Firebase/Core'
-
   target 'RunnerTests' do
     inherit! :search_paths
   end
@@ -46,10 +39,6 @@ end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
-    target.build_configurations.each do |config|
-      # Exclude arm64 for iOS Simulator
-      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
-    end
+    flutter_additional_ios_build_settings(target)
   end
 end
-

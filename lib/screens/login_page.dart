@@ -1,16 +1,10 @@
 import 'dart:convert';
-
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:easibite/screens/auth_service.dart';
 import 'package:flutter/material.dart';
-// import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'home_main.dart';
 import 'onboarding_page.dart';
-
-import 'package:flutter/material.dart';
-import 'package:auth0_flutter/auth0_flutter.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -26,36 +20,18 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
 
   late Auth0 auth0;
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
+  final String correctEmail = "user@easibite.com";
+  final String correctPassword = "password123";
 
-  Future<void> _handleGoogleSignIn(BuildContext context) async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-      // Initialize Auth0 instance
-      auth0 = Auth0(
-        'easibites.us.auth0.com',
-        'bWF1PuPqEXqmIlsnl7ybbsFzUaWByFze',
-      );
+  Future<void> _login() async {
+    final email = _emailController.text;
+    final password = _passwordController.text;
 
-      // Perform login
-      final credentials = await auth0.webAuthentication().login(useHTTPS: true);
-
-      if (credentials == null) {
-        print("Error: Credentials are null.");
-        return;
-      }
-
-      // Update state
-      setState(() {
-        _credentials = credentials;
-        _user = credentials.user;
-      });
+    if (email == correctEmail && password == correctPassword) {
       final prefs = await SharedPreferences.getInstance();
-
-      // Set the flags to true
-      await _saveUserDataToLocal();
       await prefs.setBool('isLoggedIn', true);
       setState(() {
         _isLoading = false;
@@ -63,13 +39,48 @@ class _LoginPageState extends State<LoginPage> {
 
       // Call onboarding completion check
       _checkOnboardingCompletion();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid email or password")),
+      );
+    }
+  }
+
+  Future<void> _handleGoogleSignIn(BuildContext context) async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+      auth0 = Auth0(
+        'easibites.us.auth0.com',
+        'bWF1PuPqEXqmIlsnl7ybbsFzUaWByFze',
+      );
+
+      final credentials = await auth0.webAuthentication().login(useHTTPS: true);
+      if (credentials == null) {
+        print("Error: Credentials are null.");
+        return;
+      }
+
+      setState(() {
+        _credentials = credentials;
+        _user = credentials.user;
+      });
+      final prefs = await SharedPreferences.getInstance();
+
+      await _saveUserDataToLocal();
+      await prefs.setBool('isLoggedIn', true);
+      setState(() {
+        _isLoading = false;
+      });
+
+      _checkOnboardingCompletion();
     } catch (e) {
       print('Error during login: $e');
       setState(() {
         _isLoading = false;
       });
 
-      // Navigate to error page
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -81,59 +92,42 @@ class _LoginPageState extends State<LoginPage> {
       );
     }
   }
+
   Future<void> _saveUserDataToLocal() async {
     final prefs = await SharedPreferences.getInstance();
-
-    // Convert the entire user profile to JSON
     final userJson = jsonEncode({
       'name': _user?.name ?? '',
       'email': _user?.email ?? '',
-      'profileUrl': _user?.profileUrl?.toString() ?? '',  // Convert Uri to String
-      'picture': _user?.pictureUrl?.toString() ?? '',    // Convert Uri to String
+      'profileUrl': _user?.profileUrl?.toString() ?? '',
+      'picture': _user?.pictureUrl?.toString() ?? '',
       'nickname': _user?.nickname ?? '',
       'givenName': _user?.givenName ?? '',
       'familyName': _user?.familyName ?? '',
       'locale': _user?.locale ?? '',
-      'sub': _user?.sub ?? '',  // The unique user identifier (usually available)
-      // You can add any other fields that are part of the UserProfile
+      'sub': _user?.sub ?? '',
     });
 
-    // Save the JSON string in SharedPreferences
     await prefs.setString('userProfile', userJson);
-    await prefs.setBool('isLoggedIn', true);  // Mark the user as logged in
-
+    await prefs.setBool('isLoggedIn', true);
     print("User data saved locally");
   }
-
 
   Future<void> _checkOnboardingCompletion() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final isOnboardingComplete = prefs.getBool('isOnboarded') ?? false;
 
-
       if (isOnboardingComplete) {
-        final data = prefs.getString('userPreferences');
-        if (data != null) {
-          print("Decoded preferences: $data");
-        }
-
-        // Check if _user is authenticated before navigating
         if (_user != null) {
-          print("ss1");
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => HomeMain(user: _user!)), // Pass _user to HomeMain
+            MaterialPageRoute(builder: (context) => HomeMain(user: _user!)),
           );
-        } else {
-          print("User not authenticated yet.");
         }
-      }
-      else{
-        print("ss2");
+      } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => OnboardingScreen(user: _user)), // Pass _user to HomeMain
+          MaterialPageRoute(builder: (context) => OnboardingScreen(user: _user)),
         );
       }
     } catch (e) {
@@ -145,27 +139,39 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return _isLoading
         ? LoadingScreen()
-        : EasiBiteUI(onLoginPressed: _handleGoogleSignIn); // Show loading first, then the main UI
+        : EasiBiteUI(
+      onLoginPressed: _handleGoogleSignIn,
+      emailController: _emailController,
+      passwordController: _passwordController,
+      loginFunction: _login,
+    );
   }
 }
-// Loading Screen Widget
+
 class LoadingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: CircularProgressIndicator(
-          color: Colors.orange,
-        ),
+        child: CircularProgressIndicator(color: Colors.orange),
       ),
     );
   }
 }
-// Main UI
+
 class EasiBiteUI extends StatelessWidget {
   final Function(BuildContext) onLoginPressed;
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
+  final VoidCallback loginFunction;
 
-  const EasiBiteUI({Key? key, required this.onLoginPressed}) : super(key: key);
+  const EasiBiteUI({
+    Key? key,
+    required this.onLoginPressed,
+    required this.emailController,
+    required this.passwordController,
+    required this.loginFunction,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -174,114 +180,52 @@ class EasiBiteUI extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Logo
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.orange,
-              ),
-              child: Stack(
+            // Logo and text components
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
                 children: [
-                  Center(
-                    child: Text(
-                      "EasiBite",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(
+                      labelText: "Email",
+                      border: OutlineInputBorder(),
                     ),
+                    keyboardType: TextInputType.emailAddress,
                   ),
-                  Positioned(
-                    top: -10,
-                    right: -10,
-                    child: CircleAvatar(
-                      backgroundColor: Colors.white,
-                      radius: 20,
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passwordController,
+                    decoration: const InputDecoration(
+                      labelText: "Password",
+                      border: OutlineInputBorder(),
                     ),
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: loginFunction,
+                    child: const Text("Login"),
                   ),
                 ],
               ),
             ),
-            SizedBox(height: 40),
-
-            // Welcome Text
-            Text(
-              "Welcome to",
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-            Text(
-              "EasiBite",
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.orange,
-              ),
-            ),
-            SizedBox(height: 10),
-
-            // Subtitle
-            Text(
-              "Let’s personalize your dining experience",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
-            ),
-            SizedBox(height: 40),
-
             // Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Log In Button
-                OutlinedButton(
-                  onPressed: () {
-                    onLoginPressed(context);
-                    // AuthService().signInWithGoogle();
-                  },
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.orange),
-                    padding:
-                    EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Text(
-                    "Log In",
-                    style: TextStyle(color: Colors.orange, fontSize: 16),
-                  ),
-                ),
-                SizedBox(width: 20),
-
-                // Sign Up Button
-                ElevatedButton(
-                  onPressed: () {
-                    // Handle Sign Up
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    padding:
-                    EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Text(
-                    "Sign Up",
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                ),
-              ],
-            ),
+            // Uncommented buttons
+            // Row(
+            //   mainAxisAlignment: MainAxisAlignment.center,
+            //   children: [
+            //     OutlinedButton(
+            //       onPressed: () {},
+            //       child: const Text("Log In"),
+            //     ),
+            //     const SizedBox(width: 20),
+            //     ElevatedButton(
+            //       onPressed: () {},
+            //       child: const Text("Sign Up"),
+            //     ),
+            //   ],
+            // ),
           ],
         ),
       ),
